@@ -6,7 +6,8 @@
  * async continuation, causing an immediate SIGSEGV on launch.
  *
  * This dylib hooks _availability_version_check (via fishhook/GOT patching)
- * so the check returns false for iOS 17.4, forcing the safe fallback path.
+ * so affected iOS availability checks (17.4 and newer) return false, forcing
+ * the safe fallback path.
  * Only __DATA pages are modified — no code signing violations.
  *
  * Crash signature (unpatched):
@@ -36,7 +37,8 @@ typedef struct {
 #define PACK_VERSION(major, minor, patch) \
     (((uint32_t)(major) << 16) | ((uint32_t)(minor) << 8) | (uint32_t)(patch))
 
-/* The version we need to block: iOS 17.4.0 */
+/* The first affected version. Newer iOS availability checks use the same
+ * Catalyst path in newer Fortnite builds, so they must be rejected too. */
 #define BLOCKED_VERSION  PACK_VERSION(17, 4, 0)
 
 /* ── Hook state ───────────────────────────────────────────────────── */
@@ -46,24 +48,38 @@ static bool (*orig_availability_version_check)(uint32_t count,
 
 static bool hooked_availability_version_check(uint32_t count,
                                                dyld_build_version_t versions[]) {
+    if (versions == NULL) {
+        return orig_availability_version_check
+            ? orig_availability_version_check(count, versions)
+            : false;
+    }
+
     for (uint32_t i = 0; i < count; i++) {
         if (versions[i].platform == PLATFORM_IOS &&
-            versions[i].version == BLOCKED_VERSION) {
+            versions[i].version >= BLOCKED_VERSION) {
             return false;   /* "not available" → takes the safe fallback path */
         }
     }
 
     /* All other availability checks pass through unchanged. */
-    return orig_availability_version_check(count, versions);
+    return orig_availability_version_check
+        ? orig_availability_version_check(count, versions)
+        : false;
 }
 
-/* ── Constructor (runs before main) ───────────────────────────────── */
+/* ── Constructor (runs before other tweak hooks where possible) ──────── */
 
-__attribute__((constructor))
+__attribute__((constructor(101)))
 static void fn_crashfix_init(void) {
     struct rebinding rebindings[] = {
         {
             "_availability_version_check",
+            (void *)hooked_availability_version_check,
+            (void **)&orig_availability_version_check
+        },
+        /* Some Catalyst-linked images expose one fewer Mach-O underscore. */
+        {
+            "availability_version_check",
             (void *)hooked_availability_version_check,
             (void **)&orig_availability_version_check
         },
