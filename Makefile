@@ -1,5 +1,5 @@
 DYLIB_NAME := FnMacCrashFix
-SRC        := src/fix.c src/fishhook.c
+SRC        := src/fix.m src/fishhook.c
 
 # ── Toolchain ────────────────────────────────────────────────────
 CC         := $(shell xcrun -f clang)
@@ -12,6 +12,9 @@ COMMON := -isysroot $(IOS_SDK) \
           -miphoneos-version-min=$(MIN_IOS) \
           -dynamiclib \
           -O2 -Wall -Wextra \
+          -fblocks \
+          -framework Foundation \
+          -lobjc \
           -install_name @rpath/$(DYLIB_NAME).dylib
 
 # ── Targets ──────────────────────────────────────────────────────
