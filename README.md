@@ -2,6 +2,8 @@
 
 A lightweight macOS tweak aimed at mitigating Fortnite crash behavior and compatibility checks on Apple Silicon Macs. The project is built as a dynamic library and hooks selected system/runtime checks to reduce false positives, spoof device information, and bypass detection paths that would otherwise block or crash the app.
 
+> This project is for research, experimentation, testing, and educational purposes only. It is not intended for general use or production deployment.
+
 ## Overview
 
 This tweak focuses on patching several runtime checks used by Fortnite and similar apps, including:
